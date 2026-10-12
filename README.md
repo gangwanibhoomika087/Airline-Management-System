@@ -122,11 +122,11 @@ This program is meant for Windows and needs a C compiler (GCC through MinGW, or 
 > Records are saved into `data/`. Do not delete or rename the files there while testing, or saved data will not load.
 
 ## Group members and roles
-
 | Member | Roll No. | Main work |
 |---|---|---|
-| Bhoomika Gangwani | 26K-0589 | Main program, flights, seat map, saving and loading flight data |
-| Sakshi Kumari | 26K-0596 | Input checks, passengers, bookings, fare calculation, check-in |
+| Bhoomika Gangwani | 26K-0589 | Main program, flights, seat map, check-in, saving and loading flight data |
+| Sakshi Kumari | 26K-0596 | Input checks, passengers, bookings, fare calculation, saving and loading passenger and booking data |
+
 
 ## More details
 
