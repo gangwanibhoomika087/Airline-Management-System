@@ -367,6 +367,284 @@ int countAvailableSeats(Seat seats[])
     return count;
 }
 
+/* ==========================================
+   WEEK 2 - SEAT GRID MODULE  (Bhoomika)
+   2D seat grid: 30 rows x 6 columns (A-F) = 180 seats
+   Row 1-21  Economy
+   Row 22-25 Premium Economy
+   Row 26-29 Business
+   Row 30    First Class
+   The grid is rebuilt from seats[] every time, so the
+   existing seats.dat file keeps working unchanged.
+   ========================================== */
+
+#define SEAT_ROWS 30
+#define SEAT_COLS 6
+
+int seatGrid[SEAT_ROWS][SEAT_COLS];   /* 0 = free, 1 = booked */
+
+const char *seatClassName(int seatClass)
+{
+    switch (seatClass) {
+        case 1: return "Economy";
+        case 2: return "Premium Economy";
+        case 3: return "Business";
+        case 4: return "First Class";
+        default: return "Unknown";
+    }
+}
+
+void buildSeatGrid(void)
+{
+    int r, c;
+
+    for (r = 0; r < SEAT_ROWS; r++)
+        for (c = 0; c < SEAT_COLS; c++)
+            seatGrid[r][c] = seats[r * SEAT_COLS + c].isBooked;
+}
+
+void displaySeatGrid(void)
+{
+    int r, c, cls, prevClass = 0;
+
+    buildSeatGrid();
+
+    printf("\n         A   B   C       D   E   F\n");
+
+    for (r = 0; r < SEAT_ROWS; r++) {
+        cls = seats[r * SEAT_COLS].seatClass;
+
+        if (cls != prevClass) {
+            printf("   ---- %s ----\n", seatClassName(cls));
+            prevClass = cls;
+        }
+
+        printf("  %2d  ", r + 1);
+
+        for (c = 0; c < SEAT_COLS; c++) {
+            printf("%s ", seatGrid[r][c] ? "[X]" : "[ ]");
+
+            if (c == 2)
+                printf("    ");   /* aisle */
+        }
+
+        printf("\n");
+    }
+
+    printf("\n[ ] = Available    [X] = Booked\n");
+}
+
+/* Lets the user type a seat like 12C. Returns the seat number
+   (1-180) of a free seat, or 0 if the user cancels. */
+int pickSeat(void)
+{
+    char input[16];
+    char col, extra;
+    int row, r, c;
+
+    while (1) {
+        printf("Enter seat (e.g. 12C, or 0 to cancel): ");
+
+        if (scanf("%15s", input) != 1) {
+            clearInputLine();
+            return 0;
+        }
+        clearInputLine();
+
+        if (strcmp(input, "0") == 0)
+            return 0;
+
+        if (sscanf(input, "%d%c%c", &row, &col, &extra) != 2) {
+            printf("Invalid format! Use row number then letter, e.g. 12C.\n");
+            continue;
+        }
+
+        if (col >= 'a' && col <= 'f')
+            col = col - 'a' + 'A';
+
+        if (row < 1 || row > SEAT_ROWS ||
+            col < 'A' || col >= 'A' + SEAT_COLS) {
+            printf("Invalid seat! Rows are 1-%d, columns A-F.\n", SEAT_ROWS);
+            continue;
+        }
+
+        r = row - 1;
+        c = col - 'A';
+
+        buildSeatGrid();
+
+        if (seatGrid[r][c]) {
+            printf("Seat %d%c is already booked! Pick another.\n", row, col);
+            continue;
+        }
+
+        return r * SEAT_COLS + c + 1;
+    }
+}
+
+/* Marks a seat as booked and saves; undoes the change if saving fails. */
+int bookSeatNumber(int seatNumber)
+{
+    seats[seatNumber - 1].isBooked = 1;
+
+    if (!saveSeats(seats)) {
+        seats[seatNumber - 1].isBooked = 0;
+        return 0;
+    }
+
+    return 1;
+}
+
+void seatGridMenu(void)
+{
+    int seatNumber;
+
+    displaySeatGrid();
+
+    seatNumber = pickSeat();
+
+    if (seatNumber == 0) {
+        printf("Seat selection cancelled.\n");
+        return;
+    }
+
+    if (bookSeatNumber(seatNumber))
+        printf("Seat %d%c booked successfully!\n",
+               (seatNumber - 1) / SEAT_COLS + 1,
+               'A' + (seatNumber - 1) % SEAT_COLS);
+    else
+        printf("Could not save seat booking!\n");
+}
+
+/* ==========================================
+   WEEK 2 - FARE TABLE + BOOKING SUMMARY  (Sakshi)
+   fareTable[class][passenger type]
+   rows    : 0 Economy, 1 Premium Economy, 2 Business, 3 First Class
+   columns : 0 Ordinary passenger, 1 Staff member
+   ========================================== */
+
+#define CLASS_COUNT 4
+#define TAX_PERCENT 10
+#define CURRENCY    "$"
+
+int fareTable[CLASS_COUNT][2] = {
+    {  120,   90 },   /* Economy         */
+    {  200,  150 },   /* Premium Economy */
+    {  450,  340 },   /* Business        */
+    {  900,  700 }    /* First Class     */
+};
+
+int getFare(int seatClass, int isStaff)
+{
+    return fareTable[seatClass - 1][isStaff ? 1 : 0];
+}
+
+void displayFareTable(void)
+{
+    int i;
+
+    printf("\n==========================================\n");
+    printf("               FARE TABLE\n");
+    printf("==========================================\n");
+    printf("%-20s%-14s%-14s\n", "Class", "Ordinary", "Staff");
+    printf("------------------------------------------\n");
+
+    for (i = 0; i < CLASS_COUNT; i++)
+        printf("%-20s%s%-13d%s%-13d\n",
+               seatClassName(i + 1),
+               CURRENCY, fareTable[i][0],
+               CURRENCY, fareTable[i][1]);
+
+    printf("------------------------------------------\n");
+    printf("Tax: %d%% is added to every fare.\n", TAX_PERCENT);
+}
+
+void displayBookingSummary(Passenger p, int seatNumber)
+{
+    int seatClass = seats[seatNumber - 1].seatClass;
+    int fare = getFare(seatClass, p.isStaff);
+    int tax = fare * TAX_PERCENT / 100;
+
+    printf("\n==========================================\n");
+    printf("            BOOKING SUMMARY\n");
+    printf("==========================================\n");
+    printf("Passenger ID   : %d\n", p.passengerID);
+    printf("Name           : %s\n", p.passengerName);
+    printf("Passport No.   : %s\n", p.passportNumber);
+    printf("Passenger Type : %s\n",
+           p.isStaff ? "Staff Member" : "Ordinary Passenger");
+    printf("------------------------------------------\n");
+    printf("Seat           : %d%c (Seat No. %d)\n",
+           (seatNumber - 1) / SEAT_COLS + 1,
+           'A' + (seatNumber - 1) % SEAT_COLS,
+           seatNumber);
+    printf("Class          : %s\n", seatClassName(seatClass));
+    printf("------------------------------------------\n");
+    printf("Base Fare      : %s%d\n", CURRENCY, fare);
+    printf("Tax (%d%%)      : %s%d\n", TAX_PERCENT, CURRENCY, tax);
+    printf("TOTAL          : %s%d\n", CURRENCY, fare + tax);
+    printf("==========================================\n");
+}
+
+void bookTicket(void)
+{
+    int id, i, found = -1, seatNumber;
+    char confirm;
+
+    printf("Enter passenger ID: ");
+    if (scanf("%d", &id) != 1) {
+        clearInputLine();
+        printf("Invalid ID!\n");
+        return;
+    }
+    clearInputLine();
+
+    for (i = 0; i < passengerCount; i++) {
+        if (passengers[i].passengerID == id) {
+            found = i;
+            break;
+        }
+    }
+
+    if (found == -1) {
+        printf("Passenger not found! Add the passenger first.\n");
+        return;
+    }
+
+    displayFareTable();
+    displaySeatGrid();
+
+    seatNumber = pickSeat();
+
+    if (seatNumber == 0) {
+        printf("Booking cancelled.\n");
+        return;
+    }
+
+    displayBookingSummary(passengers[found], seatNumber);
+
+    printf("Confirm booking? (Y/N): ");
+    if (scanf(" %c", &confirm) != 1) {
+        clearInputLine();
+        return;
+    }
+    clearInputLine();
+
+    if (confirm != 'Y' && confirm != 'y') {
+        printf("Booking cancelled.\n");
+        return;
+    }
+
+    if (bookSeatNumber(seatNumber))
+        printf("Ticket booked successfully!\n");
+    else
+        printf("Could not save seat booking!\n");
+}
+
+/* ==========================================
+   SEATS MENU
+   ========================================== */
+
 void seatsMenu(void)
 {
     int choice, seatNumber;
@@ -375,6 +653,8 @@ void seatsMenu(void)
         printf("\n1. Display all seats\n");
         printf("2. Book a seat\n");
         printf("3. Show available seat count\n");
+        printf("4. Seat grid (view and pick a seat)\n");
+        printf("5. View fare table\n");
         printf("0. Back\n");
         printf("Enter your choice: ");
 
@@ -419,6 +699,14 @@ void seatsMenu(void)
             case 3:
                 printf("Available seats: %d\n",
                        countAvailableSeats(seats));
+                break;
+
+            case 4:
+                seatGridMenu();
+                break;
+
+            case 5:
+                displayFareTable();
                 break;
 
             case 0:
@@ -626,7 +914,7 @@ int main(void)
                     switch (choice) {
                         case 1: addPassenger(); break;
                         case 2: printf("View Flights module not added yet.\n"); break;
-                        case 3: printf("Booking module not added yet.\n"); break;
+                        case 3: bookTicket(); break;
                         case 4: printf("Cancellation module not added yet.\n"); break;
                         case 5: printf("Rescheduling module not added yet.\n"); break;
                         case 6: viewPassengers(); break;
@@ -687,4 +975,3 @@ int main(void)
 
     return 0;
 }
-
